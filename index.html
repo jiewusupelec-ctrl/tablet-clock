@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>时钟</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fg: #ffffff;
+    --shadow: rgba(0, 0, 0, .45);
+    --scrim: rgba(0, 0, 0, .18);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #111; color: var(--fg);
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: none;
+  }
+  body::-webkit-scrollbar { display: none; }
+
+  .bg {
+    position: fixed; inset: 0;
+    background-size: cover; background-position: center;
+    transition: opacity 1.6s ease;
+  }
+  #bgFallback { background-image: var(--fallback, linear-gradient(135deg, #355c7d, #6c5b7b 50%, #c06c84)); }
+  #bgImage { opacity: 0; }
+  #bgImage.show { opacity: 1; }
+  .scrim {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 60% 55% at 50% 52%, var(--scrim), transparent 75%);
+    transition: background 1.2s ease;
+  }
+
+  .stage {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding-top: 4vh;
+    transition: transform 2s ease;
+  }
+  #clock {
+    font-family: "Baloo 2", "Arial Rounded MT Bold", "Nunito", "Varela Round", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: min(27vw, 54vh);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+    text-shadow: 0 .02em .06em var(--shadow), 0 0 .25em var(--shadow);
+    transition: color 1.2s ease, text-shadow 1.2s ease;
+    display: flex; align-items: center;
+    padding-top: .06em; /* Baloo's ascender sits high; nudge optically centred */
+  }
+  #clock .colon {
+    display: inline-block;
+    margin: 0 .02em;
+    transform: translateY(-.06em);
+    animation: blink 2s steps(1, end) infinite;
+  }
+  @keyframes blink { 50% { opacity: .35; } }
+  #quote {
+    margin-top: min(1.5vw, 3vh);
+    max-width: 88vw;
+    font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-weight: 400;
+    font-size: min(2.7vw, 5vh);
+    line-height: 1.4;
+    letter-spacing: .06em;
+    text-align: center;
+    color: var(--quote-fg, var(--fg));
+    text-shadow: 0 0 2px var(--quote-shadow, var(--shadow)), 0 1px 4px var(--quote-shadow, var(--shadow)), 0 0 16px var(--quote-shadow, var(--shadow));
+    padding: .25em .9em;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, var(--quote-scrim, transparent), transparent);
+    transition: color 1.2s ease;
+  }
+  #quote .author { margin-left: .9em; opacity: .9; white-space: nowrap; }
+  /* Drawn dash: CJK fonts render "——" too thin to read at a distance. */
+  #quote .author::before {
+    content: ""; display: inline-block; width: 1.6em; height: .09em; margin-right: .45em;
+    vertical-align: .32em; border-radius: .05em;
+    background: currentColor; box-shadow: 0 0 3px var(--quote-shadow, var(--shadow));
+  }
+
+  #date {
+    position: fixed;
+    top: max(2.2vh, env(safe-area-inset-top));
+    right: max(2.4vw, env(safe-area-inset-right));
+    font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-weight: 500;
+    font-size: min(2.2vw, 4.2vh);
+    line-height: 1.35;
+    letter-spacing: .08em;
+    text-align: right;
+    color: var(--fg);
+    text-shadow: 0 0 2px var(--shadow), 0 0 3px var(--shadow), 0 1px 5px var(--shadow), 0 0 16px var(--shadow);
+    transition: color 1.2s ease;
+    white-space: nowrap;
+  }
+  #date div { display: block; }
+
+  #hint {
+    position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%);
+    font: 600 min(1.8vw, 3.4vh)/1 "PingFang SC", "Noto Sans SC", sans-serif;
+    color: var(--fg); opacity: 0; transition: opacity .8s ease;
+    padding: .7em 1.2em; border-radius: 999px;
+    background: var(--scrim); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    pointer-events: none;
+  }
+  #hint.show { opacity: .85; }
+  #credit {
+    position: fixed; left: 1.2vw; bottom: 1vh;
+    font: 500 min(1vw, 1.8vh) system-ui, sans-serif;
+    color: var(--fg); opacity: .35;
+  }
+</style>
+</head>
+<body>
+<div id="bgFallback" class="bg"></div>
+<div id="bgImage" class="bg"></div>
+<div class="scrim"></div>
+<div class="stage" id="stage"><div id="clock"><span id="hh">--</span><span class="colon">:</span><span id="mm">--</span></div><div id="quote"><span id="quoteText"></span><span class="author" id="quoteAuthor"></span></div></div>
+<div id="date"><div id="solar"></div><div id="weekday"></div><div id="lunar"></div></div>
+<div id="hint">轻触屏幕进入全屏 · 保持常亮</div>
+<div id="credit">Photo · Unsplash</div>
+
+<script>
+/*LUNAR-START*/
+// Chinese lunisolar calendar 1900–2100, generated from ICU (Intl 'chinese' calendar) and verified day-by-day.
+// Each entry: leapMonth << 13 | bitmask (bit i set => i-th month of the year, leap month included in order, has 30 days).
+var LUNAR = {
+  ny1900: -25537, // epoch day (UTC days since 1970-01-01) of 1900 正月初一 = 1900-01-31
+  t: "1j2q,1g2,2w5,100a,18r,23f,thy,12i,28p,h8y,1g2,17ad,279,217,zor,j1,12j,l7t,2p5,1e36,2vm,2lh,174d,21i,ja,tkl,1ck,2w9,ioi,2vm,14iu,10r,21j,zau,28q,1ck,lvt,1ft,1cpf,237,10r,13yz,23x,12i,uol,2as,289,hw3,239,1cfh,112,23x,zvu,2pe,2p0,oqx,2mi,1gnp,23b,11y,141h,251,1ci,s6d,2w5,18q,lg7,23f,1cgq,12i,295,107m,28i,279,tor,217,1inf,j1,12l,146h,2p5,2oi,v1h,2lh,1wel,21i,ja,19dh,1cl,2w9,11n6,2vm,2li,l06,21j,1iom,nu,1cl,yix,1ft,1ar,tgr,10r,21n,guy,12i,1dn9,2as,289,10ur,239,10t,rcd,245,1p62,15e,2p1,17pm,2tm,2hh,tgu,11y,245,gxe,1ci,14th,2zp,18q,y3b,x7,123,l3q,295,224y,28i,279,174b,217,x7,wnv,14d,296,i1e,2oi,1e05,2lh,21h,zot,xi,14l,lnu,2x5,1klu,2vm,2li,13yu,21j,ye,qmt,1g5,1ft,lub,1ar,1cff,10r,21n,ztm,12i,291,tvu,289,1jth,239,10t,1419,245,14a,rl1,2p1,2mi,olx,2hi,1d8u,11y,245,zw2,1ci,2w5,s3u,1aj,1h1z,x7,123,142e,296,1g2,tut,285,22z,gpn,x7".split(",").map(function (s) { return parseInt(s, 36); })
+};
+var LUNAR_MONTHS = ["正", "二", "三", "四", "五", "六", "七", "八", "九", "十", "冬", "腊"];
+var LUNAR_DAYS = (function () {
+  var a = [], n = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+  for (var d = 1; d <= 30; d++) {
+    if (d <= 10) a.push("初" + n[d - 1]);
+    else if (d < 20) a.push("十" + n[d - 11]);
+    else if (d === 20) a.push("二十");
+    else if (d < 30) a.push("廿" + n[d - 21]);
+    else a.push("三十");
+  }
+  return a;
+})();
+
+// Returns {year, month (1-12), day (1-30), leap} for a local calendar date, or null if out of table range.
+function solarToLunar(y, m, d) {
+  var day = Math.round(Date.UTC(y, m - 1, d) / 864e5);
+  var ny = LUNAR.ny1900;
+  if (day < ny) return null;
+  for (var i = 0; i < LUNAR.t.length; i++) {
+    var v = LUNAR.t[i], leap = v >> 13, count = leap ? 13 : 12, len = 0, k;
+    for (k = 0; k < count; k++) len += (v >> k & 1) ? 30 : 29;
+    if (day < ny + len) {
+      var off = day - ny;
+      for (k = 0; k < count; k++) {
+        var ml = (v >> k & 1) ? 30 : 29;
+        if (off < ml) {
+          var month, isLeap = false;
+          if (!leap || k < leap) month = k + 1;
+          else if (k === leap) { month = leap; isLeap = true; }
+          else month = k;
+          return { year: 1900 + i, month: month, day: off + 1, leap: isLeap };
+        }
+        off -= ml;
+      }
+    }
+    ny += len;
+  }
+  return null;
+}
+
+function lunarIntl(date) {
+  try {
+    var parts = new Intl.DateTimeFormat("zh-CN-u-ca-chinese", { month: "long", day: "numeric" }).formatToParts(date);
+    var mp = parts.filter(function (p) { return p.type === "month"; })[0].value;
+    var dd = +parts.filter(function (p) { return p.type === "day"; })[0].value;
+    var leap = mp.indexOf("闰") === 0, name = mp.replace("闰", "").replace("月", "");
+    var idx = ["正", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "腊"].indexOf(name);
+    if (idx < 0 || !(dd >= 1 && dd <= 30)) return null;
+    return { month: idx + 1, day: dd, leap: leap };
+  } catch (e) { return null; }
+}
+
+function lunarString(date) {
+  var l = solarToLunar(date.getFullYear(), date.getMonth() + 1, date.getDate()) || lunarIntl(date);
+  if (!l) return "";
+  return (l.leap ? "闰" : "") + LUNAR_MONTHS[l.month - 1] + "月" + LUNAR_DAYS[l.day - 1];
+}
+
+function solarString(date) {
+  return (date.getMonth() + 1) + "月" + date.getDate() + "日";
+}
+
+function weekdayString(date) {
+  return "星期" + "日一二三四五六".charAt(date.getDay());
+}
+/*LUNAR-END*/
+
+/*QUOTES-START*/
+var QUOTES = [
+  "学而时习之，不亦说乎？|孔子", "三人行，必有我师焉。|孔子", "温故而知新，可以为师矣。|孔子",
+  "岁寒，然后知松柏之后凋也。|孔子", "知者不惑，仁者不忧，勇者不惧。|孔子", "敏而好学，不耻下问。|孔子",
+  "己所不欲，勿施于人。|孔子", "见贤思齐焉，见不贤而内自省也。|孔子", "德不孤，必有邻。|孔子",
+  "知之者不如好之者，好之者不如乐之者。|孔子", "逝者如斯夫，不舍昼夜。|孔子", "君子欲讷于言而敏于行。|孔子",
+  "发愤忘食，乐以忘忧，不知老之将至。|孔子", "有朋自远方来，不亦乐乎？|孔子", "学而不思则罔，思而不学则殆。|孔子",
+  "工欲善其事，必先利其器。|孔子", "三军可夺帅也，匹夫不可夺志也。|孔子", "言必信，行必果。|孔子",
+  "知者乐水，仁者乐山。|孔子", "学如不及，犹恐失之。|孔子", "知之为知之，不知为不知，是知也。|孔子",
+  "士不可以不弘毅，任重而道远。|曾子", "吾日三省吾身。|曾子", "君子以文会友，以友辅仁。|曾子",
+  "博学而笃志，切问而近思。|子夏",
+  "天时不如地利，地利不如人和。|孟子", "得道者多助，失道者寡助。|孟子", "老吾老，以及人之老；幼吾幼，以及人之幼。|孟子",
+  "富贵不能淫，贫贱不能移，威武不能屈。|孟子", "穷则独善其身，达则兼善天下。|孟子", "爱人者，人恒爱之；敬人者，人恒敬之。|孟子",
+  "千里之行，始于足下。|老子", "上善若水，水善利万物而不争。|老子", "知人者智，自知者明。|老子",
+  "合抱之木，生于毫末；九层之台，起于累土。|老子", "天下难事，必作于易；天下大事，必作于细。|老子", "大方无隅，大器晚成。|老子",
+  "君子之交淡若水。|庄子",
+  "不积跬步，无以至千里；不积小流，无以成江海。|荀子", "锲而不舍，金石可镂。|荀子", "青，取之于蓝，而青于蓝。|荀子",
+  "道虽迩，不行不至；事虽小，不为不成。|荀子", "志不强者智不达。|墨子",
+  "天行健，君子以自强不息。|《周易》", "地势坤，君子以厚德载物。|《周易》", "苟日新，日日新，又日新。|《礼记》",
+  "玉不琢，不成器；人不学，不知道。|《礼记》", "学然后知不足。|《礼记》", "博学之，审问之，慎思之，明辨之，笃行之。|《中庸》",
+  "人一能之，己百之；人十能之，己千之。|《中庸》", "知耻近乎勇。|《中庸》", "一年之计，莫如树谷；十年之计，莫如树木。|《管子》",
+  "少壮不努力，老大徒伤悲。|汉乐府", "有志者事竟成。|《后汉书》", "不飞则已，一飞冲天；不鸣则已，一鸣惊人。|《史记》",
+  "桃李不言，下自成蹊。|司马迁", "燕雀安知鸿鹄之志哉！|陈胜", "路漫漫其修远兮，吾将上下而求索。|屈原",
+  "尺有所短，寸有所长。|屈原", "人生在勤，不索何获。|张衡", "读书百遍而义自见。|董遇",
+  "非淡泊无以明志，非宁静无以致远。|诸葛亮", "静以修身，俭以养德。|诸葛亮", "勿以恶小而为之，勿以善小而不为。|刘备",
+  "老骥伏枥，志在千里；烈士暮年，壮心不已。|曹操", "及时当勉励，岁月不待人。|陶渊明", "采菊东篱下，悠然见南山。|陶渊明",
+  "业精于勤，荒于嬉；行成于思，毁于随。|韩愈", "海内存知己，天涯若比邻。|王勃", "穷且益坚，不坠青云之志。|王勃",
+  "东隅已逝，桑榆非晚。|王勃", "落霞与孤鹜齐飞，秋水共长天一色。|王勃", "欲穷千里目，更上一层楼。|王之涣",
+  "春江潮水连海平，海上明月共潮生。|张若虚", "莫愁前路无知己，天下谁人不识君。|高适",
+  "长风破浪会有时，直挂云帆济沧海。|李白", "天生我材必有用，千金散尽还复来。|李白", "大鹏一日同风起，扶摇直上九万里。|李白",
+  "清水出芙蓉，天然去雕饰。|李白", "相看两不厌，只有敬亭山。|李白",
+  "会当凌绝顶，一览众山小。|杜甫", "读书破万卷，下笔如有神。|杜甫", "好雨知时节，当春乃发生。|杜甫",
+  "两个黄鹂鸣翠柳，一行白鹭上青天。|杜甫",
+  "明月松间照，清泉石上流。|王维", "行到水穷处，坐看云起时。|王维", "大漠孤烟直，长河落日圆。|王维",
+  "沉舟侧畔千帆过，病树前头万木春。|刘禹锡", "莫道桑榆晚，为霞尚满天。|刘禹锡", "自古逢秋悲寂寞，我言秋日胜春朝。|刘禹锡",
+  "晴空一鹤排云上，便引诗情到碧霄。|刘禹锡", "千淘万漉虽辛苦，吹尽狂沙始到金。|刘禹锡",
+  "春风得意马蹄疾，一日看尽长安花。|孟郊", "谁言寸草心，报得三春晖。|孟郊", "野火烧不尽，春风吹又生。|白居易",
+  "日出江花红胜火，春来江水绿如蓝。|白居易", "停车坐爱枫林晚，霜叶红于二月花。|杜牧", "少年心事当拏云。|李贺",
+  "黑发不知勤学早，白首方悔读书迟。|颜真卿", "先天下之忧而忧，后天下之乐而乐。|范仲淹", "不以物喜，不以己悲。|范仲淹",
+  "万物静观皆自得，四时佳兴与人同。|程颢", "不畏浮云遮望眼，自缘身在最高层。|王安石",
+  "竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生。|苏轼", "但愿人长久，千里共婵娟。|苏轼", "人间有味是清欢。|苏轼",
+  "莫听穿林打叶声，何妨吟啸且徐行。|苏轼", "博观而约取，厚积而薄发。|苏轼", "粗缯大布裹生涯，腹有诗书气自华。|苏轼",
+  "一年好景君须记，最是橙黄橘绿时。|苏轼", "欲把西湖比西子，淡妆浓抹总相宜。|苏轼",
+  "山重水复疑无路，柳暗花明又一村。|陆游", "纸上得来终觉浅，绝知此事要躬行。|陆游",
+  "问渠那得清如许？为有源头活水来。|朱熹", "等闲识得东风面，万紫千红总是春。|朱熹",
+  "小荷才露尖尖角，早有蜻蜓立上头。|杨万里", "接天莲叶无穷碧，映日荷花别样红。|杨万里", "春色满园关不住，一枝红杏出墙来。|叶绍翁",
+  "青山遮不住，毕竟东流去。|辛弃疾", "不要人夸好颜色，只留清气满乾坤。|王冕", "粉骨碎身浑不怕，要留清白在人间。|于谦",
+  "千磨万击还坚劲，任尔东西南北风。|郑燮", "江山代有才人出，各领风骚数百年。|赵翼", "海纳百川，有容乃大；壁立千仞，无欲则刚。|林则徐",
+  "我劝天公重抖擞，不拘一格降人才。|龚自珍", "落红不是无情物，化作春泥更护花。|龚自珍", "少年强则国强。|梁启超",
+  "其实地上本没有路，走的人多了，也便成了路。|鲁迅"
+];
+// QUOTE_STEP is coprime with the list length, so consecutive days never repeat and every quote appears once per cycle.
+var QUOTE_STEP = 47;
+function quoteFor(date) {
+  var day = Math.round(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 864e5);
+  var n = QUOTES.length, q = QUOTES[((day * QUOTE_STEP) % n + n) % n].split("|");
+  return { text: q[0], author: q[1] };
+}
+/*QUOTES-END*/
+
+(function () {
+  var params = new URLSearchParams(location.search);
+  // ?t=2026-10-11T08:30 fakes the clock (for testing); ?img=N forces a background.
+  var fakeStart = params.get("t") ? new Date(params.get("t")).getTime() : null;
+  var realStart = Date.now();
+  function now() { return fakeStart ? new Date(fakeStart + (Date.now() - realStart)) : new Date(); }
+
+  var PHOTOS = [
+    "1506905925346-21bda4d32df4", "1464822759023-fed622ff2c3b", "1501785888041-af3ef285b470", "1470071459604-3b5ec3a7fe05",
+    "1441974231531-c6227db76b6e", "1472214103451-9374bd1c798e", "1469474968028-56623f02e42e", "1500530855697-b586d89ba3ee",
+    "1507525428034-b723cf961d3e", "1426604966848-d7adac402bff", "1447752875215-b2761acb3c5d", "1433086966358-54859d0ed716",
+    "1465146344425-f00d5f5c8f07", "1418065460487-3e41a6c84dc5", "1475924156734-496f6cac6ec1", "1490750967868-88aa4486c946",
+    "1439853949127-fa647821eba0", "1511884642898-4c92249e20b6", "1454496522488-7a8e488e8606", "1519681393784-d120267933ba",
+    "1482938289607-e9573fc25ebb", "1505765050516-f72dcac9c60e", "1494500764479-0c8f2919a3d8", "1500534314209-a25ddb2bd429",
+    "1502082553048-f009c37129b9", "1431794062232-2a99a5431c6c", "1414609245224-afa02bfb3fda", "1476514525535-07fb3b4ae5f1",
+    "1504893524553-b855bce32c67", "1508739773434-c26b3d09e071", "1513836279014-a89f7a76ae86", "1516214104703-d870798883c5",
+    "1532274402911-5a369e4c4bb5", "1542224566-6e85f2e6772f", "1540206395-68808572332f", "1528184039930-bd03972bd974",
+    "1470770841072-f978cf4d019e", "1473773508845-188df298d2d1", "1509316975850-ff9c5deb0cd9", "1497436072909-60f360e1d4b1"
+  ];
+  var GRADIENTS = [
+    ["#355c7d", "#6c5b7b", "#c06c84"], ["#0f2027", "#203a43", "#2c5364"], ["#ff7e5f", "#feb47b", "#ffcf9f"],
+    ["#134e5e", "#3f8f6b", "#71b280"], ["#41295a", "#2f0743", "#5b2a86"], ["#1e3c72", "#2a5298", "#6fa3ef"],
+    ["#ee9ca7", "#f6c1c7", "#ffdde1"], ["#2c3e50", "#4ca1af", "#c4e0e5"]
+  ];
+
+  function dayNumber(d) { return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); }
+  function hourSlot(d) { return dayNumber(d) * 24 + d.getHours(); }
+  // 17 is coprime with the list length, so consecutive hours walk through every photo before any repeat,
+  // and the same hour on consecutive days lands 8 photos apart.
+  function photoIndex(slot) {
+    if (params.get("img") !== null) return ((+params.get("img") % PHOTOS.length) + PHOTOS.length) % PHOTOS.length;
+    return ((slot * 17) % PHOTOS.length + PHOTOS.length) % PHOTOS.length;
+  }
+  function photoUrl(i) {
+    var w = Math.min(2560, Math.ceil(Math.max(screen.width, screen.height, innerWidth) * Math.min(devicePixelRatio || 1, 2) / 256) * 256);
+    return "https://images.unsplash.com/photo-" + PHOTOS[i] + "?auto=format&fit=crop&q=80&w=" + w;
+  }
+
+  var root = document.documentElement.style;
+  var $ = function (id) { return document.getElementById(id); };
+  var bgImage = $("bgImage");
+
+  function applyTheme(lum, r, g, b) {
+    // Light background -> deep, slightly tinted ink; dark/mid background -> warm white.
+    if (lum > 0.58) {
+      var k = 0.22;
+      root.setProperty("--fg", "rgb(" + Math.round(r * k) + "," + Math.round(g * k) + "," + Math.round(b * k + 10) + ")");
+      root.setProperty("--shadow", "rgba(255,255,255,.55)");
+      root.setProperty("--scrim", "rgba(255,255,255,.28)");
+    } else {
+      root.setProperty("--fg", "#fffdf7");
+      root.setProperty("--shadow", lum > 0.42 ? "rgba(0,0,0,.6)" : "rgba(0,0,0,.42)");
+      root.setProperty("--scrim", lum > 0.42 ? "rgba(0,0,0,.3)" : "rgba(0,0,0,.16)");
+    }
+  }
+
+  // The quote sits below the clock region, so it gets its own contrast decision from the pixels right behind it, with a stronger halo.
+  function applyTextTheme(prefix, c) {
+    var lum = c[0];
+    if (lum > 0.6) {
+      root.setProperty("--" + prefix + "-fg", "rgb(" + Math.round(c[1] * .2) + "," + Math.round(c[2] * .2) + "," + Math.round(c[3] * .2 + 10) + ")");
+      root.setProperty("--" + prefix + "-shadow", "rgba(255,255,255,.75)");
+      root.setProperty("--" + prefix + "-scrim", "rgba(255,255,255,.35)");
+    } else {
+      root.setProperty("--" + prefix + "-fg", "#fffdf7");
+      root.setProperty("--" + prefix + "-shadow", lum > 0.4 ? "rgba(0,0,0,.75)" : "rgba(0,0,0,.5)");
+      root.setProperty("--" + prefix + "-scrim", lum > 0.4 ? "rgba(0,0,0,.3)" : "rgba(0,0,0,.18)");
+    }
+  }
+
+  // Average colour of the region where the clock sits (cover-cropped like the CSS background).
+  function sample(img) {
+    try {
+      var c = document.createElement("canvas"), W = 160, H = Math.round(160 * innerHeight / innerWidth);
+      c.width = W; c.height = H;
+      var ctx = c.getContext("2d");
+      var s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+      var dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      var avg = function (x, y, w, h) {
+        var data = ctx.getImageData(Math.round(W * x), Math.round(H * y), Math.round(W * w), Math.round(H * h)).data;
+        var r = 0, g = 0, b = 0, L = 0, n = data.length / 4;
+        for (var i = 0; i < data.length; i += 4) {
+          r += data[i]; g += data[i + 1]; b += data[i + 2];
+          L += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
+        }
+        return [L / n, r / n, g / n, b / n];
+      };
+      var c1 = avg(0.12, 0.22, 0.76, 0.6);
+      applyTheme(c1[0], c1[1], c1[2], c1[3]);
+      var qr = $("quote").getBoundingClientRect();
+      applyTextTheme("quote", qr.width ? avg(qr.left / innerWidth, qr.top / innerHeight, qr.width / innerWidth, qr.height / innerHeight) : avg(0.15, 0.68, 0.7, 0.12));
+    } catch (e) {
+      applyTheme(0.5, 0, 0, 0); // canvas tainted: white text with a strong shadow is safest
+      applyTextTheme("quote", [0.5, 0, 0, 0]);
+    }
+  }
+
+  var currentSlot = null;
+  function setBackground(d) {
+    var slot = hourSlot(d);
+    if (slot === currentSlot) return;
+    var first = currentSlot === null;
+    currentSlot = slot;
+    if (first) {
+      var dn = dayNumber(d), gr = GRADIENTS[((dn % GRADIENTS.length) + GRADIENTS.length) % GRADIENTS.length];
+      root.setProperty("--fallback", "linear-gradient(135deg," + gr[0] + "," + gr[1] + " 55%," + gr[2] + ")");
+      applyTheme(0.4, 0, 0, 0);
+    }
+    var idx = photoIndex(slot), url = photoUrl(idx), img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function () {
+      if (slot !== currentSlot) return;
+      sample(img);
+      bgImage.classList.remove("show");
+      setTimeout(function () {
+        bgImage.style.backgroundImage = "url('" + url + "')";
+        bgImage.classList.add("show");
+      }, bgImage.style.backgroundImage ? 900 : 0);
+      // Warm the cache with next hour's photo so the switch is instant on flaky Wi-Fi.
+      var t = new Image(); t.crossOrigin = "anonymous";
+      t.src = photoUrl(photoIndex(slot + 1));
+    };
+    // Keep the previous hour's photo if the new one can't load; the gradient only shows when nothing loaded yet.
+    img.onerror = function () {};
+    img.src = url;
+  }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  var timer;
+  function tick() {
+    var d = now();
+    $("hh").textContent = pad(d.getHours());
+    $("mm").textContent = pad(d.getMinutes());
+    $("solar").textContent = solarString(d);
+    $("weekday").textContent = weekdayString(d);
+    $("lunar").textContent = lunarString(d);
+    var q = quoteFor(d);
+    $("quoteText").textContent = q.text;
+    $("quoteAuthor").textContent = q.author;
+    setBackground(d);
+    // Tiny drift each minute to reduce burn-in on always-on screens.
+    var m = d.getMinutes();
+    $("stage").style.transform = "translate(" + ((m % 5) - 2) * 3 + "px," + ((m % 3) - 1) * 3 + "px)";
+    clearTimeout(timer);
+    timer = setTimeout(tick, 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 30);
+  }
+
+  var wakeLock = null;
+  function requestWakeLock() {
+    if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+    navigator.wakeLock.request("screen").then(function (l) {
+      wakeLock = l;
+      l.addEventListener("release", function () { wakeLock = null; });
+    }).catch(function () {});
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") { tick(); if (!wakeLock) requestWakeLock(); }
+  });
+
+  function toggleFullscreen() {
+    var el = document.documentElement;
+    var fs = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!fs) {
+      var req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req) { var p = req.call(el, { navigationUI: "hide" }); if (p && p.catch) p.catch(function () {}); }
+      if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(function () {});
+    }
+    requestWakeLock();
+    $("hint").classList.remove("show");
+  }
+  document.addEventListener("click", toggleFullscreen);
+  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+
+  var hint = $("hint");
+  if (!params.has("t")) {
+    setTimeout(function () { hint.classList.add("show"); }, 600);
+    setTimeout(function () { hint.classList.remove("show"); }, 6000);
+  }
+
+  tick();
+  requestWakeLock();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(tick);
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+    // A new version took over an already-open clock: reload once so the tablet shows it.
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (hadController && !reloaded) { reloaded = true; location.reload(); }
+    });
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) {
+      setInterval(function () { reg.update().catch(function () {}); }, 3600000);
+    }).catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>
